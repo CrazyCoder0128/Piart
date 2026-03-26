@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: piart-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: piart
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - piart
+
+  postgres-read-replica:
+    image: postgres:16
+    container_name: piart-postgres-read
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: piart
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    depends_on:
+      - postgres
+    networks:
+      - piart
+
+  redis:
+    image: redis:7-alpine
+    container_name: piart-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - piart
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: piart-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    networks:
+      - piart
+
+networks:
+  piart:
+    name: piart
+
+volumes:
+  postgres_data:
+    name: piart_postgres_data
+  meilisearch_data:
+    name: piart_meilisearch_data
