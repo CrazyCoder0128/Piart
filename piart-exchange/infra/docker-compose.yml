@@ -6,9 +6,11 @@ services:
     container_name: piart-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: piart
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-piart}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-replicator}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?POSTGRES_REPLICATION_PASSWORD is required}
     command:
       - "postgres"
       - "-c"
@@ -35,12 +37,12 @@ services:
     container_name: piart-postgres-read
     restart: unless-stopped
     environment:
-      POSTGRES_USER: replicator
-      PGPASSWORD: replicator_password
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-replicator}
+      PGPASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?POSTGRES_REPLICATION_PASSWORD is required}
     command: >
       bash -c '
       if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
-        until pg_basebackup --pgdata=/var/lib/postgresql/data --write-recovery-conf --host=postgres --port=5432 --username=replicator; do
+        until pg_basebackup --pgdata=/var/lib/postgresql/data --write-recovery-conf --host=postgres --port=5432 --username="$${POSTGRES_REPLICATION_USER}"; do
           echo "Waiting for primary to become available...";
           sleep 2;
         done;
