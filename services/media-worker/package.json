@@ -1,0 +1,23 @@
+{
+  "name": "@piart/media-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --build",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@piart/config": "workspace:*",
+    "bullmq": "^5.8.3",
+    "ioredis": "^5.4.1",
+    "sharp": "^0.33.4"
+  },
+  "devDependencies": {
+    "tsx": "^4.15.6",
+    "typescript": "^5.4.5"
+  }
+}
