@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  postgres-primary:
+    image: postgres:16
+    container_name: piart-postgres-primary
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: piart
+      POSTGRES_PASSWORD: piart_dev
+      POSTGRES_DB: piart_exchange
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - piart
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U piart"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-replica:
+    image: postgres:16
+    container_name: piart-postgres-replica
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: piart
+      POSTGRES_PASSWORD: piart_dev
+      POSTGRES_DB: piart_exchange
+    networks:
+      - piart
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: piart-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - piart
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: piart-meilisearch
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: piart_meili_dev_key
+    volumes:
+      - meilisearch-data:/meili_data
+    networks:
+      - piart
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:
+  meilisearch-data:
+
+networks:
+  piart:
+    driver: bridge
