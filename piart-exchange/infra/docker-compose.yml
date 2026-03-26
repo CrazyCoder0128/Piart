@@ -1,0 +1,93 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: piart-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-piart}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-replicator}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?POSTGRES_REPLICATION_PASSWORD is required}
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=replica"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "hot_standby=on"
+      - "-c"
+      - "hba_file=/etc/postgresql/pg_hba.conf"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - piart
+
+  postgres-read-replica:
+    image: postgres:16
+    container_name: piart-postgres-read
+    restart: unless-stopped
+    environment:
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-replicator}
+      PGPASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?POSTGRES_REPLICATION_PASSWORD is required}
+    command: >
+      bash -c '
+      if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+        until pg_basebackup --pgdata=/var/lib/postgresql/data --write-recovery-conf --host=postgres --port=5432 --username="$${POSTGRES_REPLICATION_USER}"; do
+          echo "Waiting for primary to become available...";
+          sleep 2;
+        done;
+      fi;
+      exec postgres
+      '
+    ports:
+      - "5433:5432"
+    depends_on:
+      - postgres
+    volumes:
+      - postgres_read_data:/var/lib/postgresql/data
+    networks:
+      - piart
+
+  redis:
+    image: redis:7-alpine
+    container_name: piart-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - piart
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: piart-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    networks:
+      - piart
+
+networks:
+  piart:
+    name: piart
+
+volumes:
+  postgres_data:
+    name: piart_postgres_data
+  postgres_read_data:
+    name: piart_postgres_read_data
+  meilisearch_data:
+    name: piart_meilisearch_data
