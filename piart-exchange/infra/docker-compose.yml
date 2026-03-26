@@ -9,10 +9,24 @@ services:
       POSTGRES_DB: piart
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=replica"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "hot_standby=on"
+      - "-c"
+      - "hba_file=/etc/postgresql/pg_hba.conf"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     networks:
       - piart
 
@@ -21,13 +35,24 @@ services:
     container_name: piart-postgres-read
     restart: unless-stopped
     environment:
-      POSTGRES_DB: piart
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: replicator
+      PGPASSWORD: replicator_password
+    command: >
+      bash -c '
+      if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+        until pg_basebackup --pgdata=/var/lib/postgresql/data --write-recovery-conf --host=postgres --port=5432 --username=replicator; do
+          echo "Waiting for primary to become available...";
+          sleep 2;
+        done;
+      fi;
+      exec postgres
+      '
     ports:
       - "5433:5432"
     depends_on:
       - postgres
+    volumes:
+      - postgres_read_data:/var/lib/postgresql/data
     networks:
       - piart
 
@@ -60,5 +85,7 @@ networks:
 volumes:
   postgres_data:
     name: piart_postgres_data
+  postgres_read_data:
+    name: piart_postgres_read_data
   meilisearch_data:
     name: piart_meilisearch_data
